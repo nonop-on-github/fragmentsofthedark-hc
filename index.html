@@ -13,8 +13,10 @@
     body {
       margin: 0;
       padding: 0;
-      background: #0a0a0f;
-      overflow: hidden;
+      background: #181823;
+      overflow-x: hidden;
+      overflow-y: auto;
+      height: 300vh;
       cursor: crosshair;
       user-select: none;
       -webkit-user-select: none;
@@ -24,14 +26,24 @@
       display: block;
       width: 100vw;
       height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: -1;
     }
 
-    .overlay {
+    .scroll-container {
       position: absolute;
-      bottom: 40px;
+      top: 0;
       left: 40px;
       z-index: 10;
       pointer-events: none;
+      width: 100%;
+    }
+
+    .text-block {
+      margin-top: 85vh;
+      margin-bottom: 60vh;
       text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
       animation: driftIn 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
@@ -59,6 +71,7 @@
         transform: translateY(8px);
         filter: blur(4px);
       }
+
       to {
         opacity: 1;
         transform: translateY(0);
@@ -69,43 +82,53 @@
 </head>
 
 <body>
-  <div class="overlay">
-    <h1 class="title">Fragments of the Dark</h1>
-    <p class="subtitle">obs. log #04 // late-night wanderings on the bedroom ceiling</p>
+  <div class="scroll-container">
+    <div class="text-block">
+      <h1 class="title">Fragments of the Dark</h1>
+      <p class="subtitle">obs. log #04 // late-night wanderings on the bedroom ceiling</p>
+    </div>
+    <div class="text-block">
+      <h1 class="title">A Silent Orbit</h1>
+      <p class="subtitle">obs. log #05 // discovering new geometry</p>
+    </div>
+    <div class="text-block">
+      <h1 class="title">Into the Void</h1>
+      <p class="subtitle">obs. log #06 // drifting further away</p>
+    </div>
   </div>
 
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
     let scene, cam, renderer, clock;
-    let planet, ring, starsBackground, starsForeground, ico;
+    let planet, ring, starsBackground, starsForeground, ico, extraShape;
     let targetX = 0, targetY = 0;
+    let scrollY = 0;
 
     function makePlanetTexture() {
       let canvas = document.createElement('canvas');
       canvas.width = canvas.height = 512;
       let ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#080a14';
+      // Made base slightly brighter
+      ctx.fillStyle = '#0f1426';
       ctx.fillRect(0, 0, 512, 512);
 
-      // soft watercolor nebulous dust
       for (let i = 0; i < 25; i++) {
         let x = Math.random() * 512;
         let y = Math.random() * 512;
         let r = Math.random() * 120 + 40;
         let grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-        grad.addColorStop(0, Math.random() > 0.4 ? 'rgba(24, 46, 79, 0.7)' : 'rgba(15, 68, 82, 0.6)');
-        grad.addColorStop(1, 'rgba(8, 10, 20, 0)');
+        grad.addColorStop(0, Math.random() > 0.4 ? 'rgba(34, 66, 109, 0.8)' : 'rgba(25, 88, 102, 0.7)');
+        grad.addColorStop(1, 'rgba(15, 20, 38, 0)');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, 512, 512);
       }
 
-      // tiny star-craters on surface
       for (let i = 0; i < 150; i++) {
         let x = Math.random() * 512;
         let y = Math.random() * 512;
         let size = Math.random() * 1.5 + 0.5;
-        ctx.fillStyle = `rgba(232, 224, 208, ${Math.random() * 0.25})`;
+        ctx.fillStyle = `rgba(232, 224, 208, ${Math.random() * 0.4})`;
         ctx.beginPath();
         ctx.arc(x, y, size, 0, Math.PI * 2);
         ctx.fill();
@@ -117,10 +140,9 @@
       let canvas = document.createElement('canvas');
       canvas.width = canvas.height = 256;
       let ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#666';
+      ctx.fillStyle = '#777';
       ctx.fillRect(0, 0, 256, 256);
 
-      // scratchy graphite-like grain
       for (let i = 0; i < 1200; i++) {
         let x = Math.random() * 256;
         let y = Math.random() * 256;
@@ -138,20 +160,19 @@
       cam = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
       cam.position.z = 8;
 
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       document.body.appendChild(renderer.domElement);
 
-      // lighting: compliant with constraints while remaining moody
-      let ambient = new THREE.AmbientLight(0xffffff, 0.3);
+      // Lightened the scene
+      let ambient = new THREE.AmbientLight(0xffffff, 0.6);
       scene.add(ambient);
 
-      let point = new THREE.PointLight(0xffd4a0, 2.0, 30);
+      let point = new THREE.PointLight(0xffd4a0, 4.0, 40);
       point.position.set(-5, 5, 3);
       scene.add(point);
 
-      // 1. Planet
       let planetGeo = new THREE.SphereGeometry(1.2, 32, 32);
       let planetMat = new THREE.MeshStandardMaterial({
         map: makePlanetTexture(),
@@ -160,10 +181,9 @@
       planet = new THREE.Mesh(planetGeo, planetMat);
       scene.add(planet);
 
-      // 2. Torus (Saturn-like ring)
       let ringGeo = new THREE.TorusGeometry(2.0, 0.12, 16, 100);
       let ringMat = new THREE.MeshStandardMaterial({
-        color: 0x242e3d,
+        color: 0x3a485e,
         roughnessMap: makeRoughnessTexture(),
         roughness: 0.7
       });
@@ -171,7 +191,6 @@
       ring.rotation.x = Math.PI / 2.3;
       scene.add(ring);
 
-      // 3. Stars (layered particle system for spatial depth)
       let bgCount = 600;
       let bgGeo = new THREE.BufferGeometry();
       let bgPos = new Float32Array(bgCount * 3);
@@ -188,7 +207,7 @@
         color: 0xa5b4fc,
         size: 0.02,
         transparent: true,
-        opacity: 0.4
+        opacity: 0.6
       });
       starsBackground = new THREE.Points(bgGeo, bgMat);
       scene.add(starsBackground);
@@ -209,25 +228,40 @@
         color: 0xffedd5,
         size: 0.04,
         transparent: true,
-        opacity: 0.75
+        opacity: 0.9
       });
       starsForeground = new THREE.Points(fgGeo, fgMat);
       scene.add(starsForeground);
 
-      // 4. Icosahedron (floating, offset by exactly 1.7 units on X)
       let icoGeo = new THREE.IcosahedronGeometry(0.28, 0);
       let icoMat = new THREE.MeshStandardMaterial({
-        color: 0x6e8092,
+        color: 0x8a9eb2,
         flatShading: true,
         roughness: 0.6
       });
       ico = new THREE.Mesh(icoGeo, icoMat);
-      ico.position.set(1.7, -0.6, 1.4); // intentional offset
+      ico.position.set(1.7, -0.6, 1.4);
       scene.add(ico);
+
+      // New extra shape
+      let extraGeo = new THREE.OctahedronGeometry(0.5, 0);
+      let extraMat = new THREE.MeshStandardMaterial({
+        color: 0x5a7d9c,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.7
+      });
+      extraShape = new THREE.Mesh(extraGeo, extraMat);
+      extraShape.position.set(-2.5, -3.0, 0.5); // Starts below the initial view
+      scene.add(extraShape);
 
       window.addEventListener('mousemove', (e) => {
         targetX = (e.clientX / window.innerWidth - 0.5) * 0.1;
         targetY = (e.clientY / window.innerHeight - 0.5) * 0.1;
+      });
+
+      window.addEventListener('scroll', () => {
+        scrollY = window.scrollY;
       });
 
       window.addEventListener('resize', () => {
@@ -251,25 +285,30 @@
         planet.rotation.y += 0.0008;
       }
 
-      // gentle spin and bobbing for the icosahedron
       if (ico) {
-        ico.position.y = -0.6 + Math.sin(t) * 0.15;
+        ico.position.y = -0.6 + Math.sin(t) * 0.15 + (scrollY * 0.001); // Also slightly moves with scroll
         ico.rotation.x += 0.004;
         ico.rotation.y += 0.002;
       }
 
-      // slow starry twinkle/pulsation
-      if (starsForeground && starsBackground) {
-        starsForeground.material.opacity = 0.65 + Math.sin(t * 1.5) * 0.1;
-        starsBackground.material.opacity = 0.35 + Math.sin(t * 0.8) * 0.05;
+      if (extraShape) {
+        extraShape.rotation.x -= 0.005;
+        extraShape.rotation.y -= 0.003;
+        // Moves up as you scroll down
+        extraShape.position.y = -3.0 + (scrollY * 0.004);
       }
 
-      // very slow camera breathing to enhance the dreamlike feeling
+      if (starsForeground && starsBackground) {
+        starsForeground.material.opacity = 0.75 + Math.sin(t * 1.5) * 0.15;
+        starsBackground.material.opacity = 0.45 + Math.sin(t * 0.8) * 0.1;
+      }
+
+      // Camera moves slightly with scroll to create a parallax effect with the objects
       if (cam) {
         cam.position.z = 8.0 + Math.sin(t * 0.4) * 0.12;
+        cam.position.y = -(scrollY * 0.0015);
       }
 
-      // mouse parallax
       scene.rotation.y += (targetX - scene.rotation.y) * 0.05;
       scene.rotation.x += (targetY - scene.rotation.x) * 0.05;
 
