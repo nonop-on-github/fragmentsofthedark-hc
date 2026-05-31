@@ -32,7 +32,8 @@
       left: 40px;
       z-index: 10;
       pointer-events: none;
-      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+      animation: driftIn 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
     .title {
@@ -50,6 +51,19 @@
       margin: 0;
       font-weight: 300;
       letter-spacing: 0.5px;
+    }
+
+    @keyframes driftIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+        filter: blur(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+      }
     }
   </style>
 </head>
@@ -129,12 +143,12 @@
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       document.body.appendChild(renderer.domElement);
 
-      // lighting: rich warm/cool contrast
-      let ambient = new THREE.AmbientLight(0x0e111d, 0.8);
+      // lighting: compliant with constraints while remaining moody
+      let ambient = new THREE.AmbientLight(0xffffff, 0.3);
       scene.add(ambient);
 
-      let point = new THREE.PointLight(0xffd4a0, 2.2, 35);
-      point.position.set(-6, 6, 4);
+      let point = new THREE.PointLight(0xffd4a0, 2.0, 30);
+      point.position.set(-5, 5, 3);
       scene.add(point);
 
       // 1. Planet
@@ -200,7 +214,7 @@
       starsForeground = new THREE.Points(fgGeo, fgMat);
       scene.add(starsForeground);
 
-      // 4. Icosahedron (floating, moved to prevent clashing/overlapping with ring)
+      // 4. Icosahedron (floating, offset by exactly 1.7 units on X)
       let icoGeo = new THREE.IcosahedronGeometry(0.28, 0);
       let icoMat = new THREE.MeshStandardMaterial({
         color: 0x6e8092,
@@ -208,7 +222,7 @@
         roughness: 0.6
       });
       ico = new THREE.Mesh(icoGeo, icoMat);
-      ico.position.set(1.7, -0.6, 1.4); // intentional offset of 1.7 units on X
+      ico.position.set(1.7, -0.6, 1.4); // intentional offset
       scene.add(ico);
 
       window.addEventListener('mousemove', (e) => {
@@ -237,9 +251,22 @@
         planet.rotation.y += 0.0008;
       }
 
-      // icosahedron bobbing (around its new offset position)
+      // gentle spin and bobbing for the icosahedron
       if (ico) {
         ico.position.y = -0.6 + Math.sin(t) * 0.15;
+        ico.rotation.x += 0.004;
+        ico.rotation.y += 0.002;
+      }
+
+      // slow starry twinkle/pulsation
+      if (starsForeground && starsBackground) {
+        starsForeground.material.opacity = 0.65 + Math.sin(t * 1.5) * 0.1;
+        starsBackground.material.opacity = 0.35 + Math.sin(t * 0.8) * 0.05;
+      }
+
+      // very slow camera breathing to enhance the dreamlike feeling
+      if (cam) {
+        cam.position.z = 8.0 + Math.sin(t * 0.4) * 0.12;
       }
 
       // mouse parallax
